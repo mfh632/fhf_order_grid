@@ -2,7 +2,6 @@
 
 
 namespace FHF\OrderGrid;
-use WC_Order_Query;
 
 /**
  * Class Settings
@@ -10,28 +9,17 @@ use WC_Order_Query;
  */
 class Settings extends BaseComponent
 {
-
     public function __construct()
     {
         add_action('admin_menu', [$this, 'add_admin_menu']);
-
     }
 
     public function add_admin_menu(){
-
         add_menu_page(
             'Order Settings',
             'Order List',
             'manage_options',
             'fhf-order-grid',
-            [$this, 'settings_page']
-        );
-        add_submenu_page(
-                'fhf-order-grid',
-            'Display Orders',
-            'Dispaly Orders',
-            'manage_options',
-            'fhf-order-grid-display',
             [$this, 'fhf_display_order']
         );
     }
@@ -50,46 +38,65 @@ class Settings extends BaseComponent
             'orderby' => 'date',
             'order' => 'DESC',
         ]);
+        $ids = [];
+
+        if (isset($args['product_name']) && !empty($args['product_name'])){
+            $limit = $args['limit'];
+            global $wpdb;
+            $t_orders = $wpdb->prefix . "wc_orders";
+            $t_order_items = $wpdb->prefix . "woocommerce_order_items";
+
+            $productName = $args['product_name'];
+
+            $query  = "SELECT id FROM $t_orders AS o ";
+            $query  .= "LEFT JOIN $t_order_items AS oi ON oi.order_id=o.id ";
+            $query  .= "WHERE  oi.order_item_name='". $productName . "' ";
+            $query  .= "ORDER BY  o.date_created_gmt DESC ";
+            $query  .= "LIMIT  $limit";
+
+            $orderIds = $wpdb->get_results($query, 'ARRAY_A');
+
+            if ($orderIds){
+                foreach ($orderIds as $orderId){
+                    $ids[] = $orderId['id'];
+                }
+                $args['id'] = $ids;
+            } else {
+                return [];
+            }
+        }
 
         $orders = wc_get_orders($args);
-
         return $orders;
     }
 
-    public function settings_page(){
-
-        ?>
-        <div class="wrap">
-            <h2>OrderGrid Settings</h2>
-            <p>Under Development</p>
-        </div>
-        <?php
-    }
     public function fhf_display_order(){
         $limit = $_GET['limit'] ?? 20;
+        $product_name = $_GET['product_name'] ?? "";
 
-        $orders = $this->get_order_list(['limit' => $limit]);
-
+        $orders = $this->get_order_list(['limit' => $limit, 'product_name' => $product_name]);
 
         ?>
         <div class="container-fluid">
             <h2 class="mb-4 mt-4 head">Order List</h2>
             <div class="d-flex justify-content-between">
-                <form>
-                    <div class="row g-3 align-items-center">
-                        <div class="col-auto">
-                            <label for="limit" class="col-form-label">Limit</label>
-                        </div>
-                        <div class="col-auto">
+                <form class="row g-3 align-items-center">
+                    <div class="col-auto">
+                        <div class="input-group">
+                            <span class="input-group-text">Limit</span>
                             <input type="number" id="limit" name="limit" class="form-control" min="1" value="<?php echo $limit;?>">
-                            <input type="hidden" name="page" class="form-control" value="fhf-order-grid-display" />
                         </div>
-                        <div class="col-auto">
-                            <button type="submit" class="btn btn-primary ">Submit</button>
-                        </div>
-
                     </div>
-
+                    <div class="col-auto">
+                        <div class="input-group">
+                            <span class="input-group-text">Product Name</span>
+                            <input type="text" id="product_name" name="product_name" class="form-control"  value="<?php echo $product_name;?>">
+                        </div>
+                    </div>
+                    <input type="hidden" name="page" class="form-control" value="fhf-order-grid" />
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-primary ">Submit</button>
+                    </div>
                 </form>
                 <div>
                     <button type="button" id="exportToExcel" class="btn btn-primary ">Export</button>
@@ -126,7 +133,7 @@ class Settings extends BaseComponent
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="7">Not found</td>
+                            <td colspan="7" class="text-center">Not found</td>
                         </tr>
                     <?php endif; ?>
                 </tbody>
@@ -149,5 +156,4 @@ class Settings extends BaseComponent
         </script>
         <?php
     }
-
 }
