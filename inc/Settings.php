@@ -9,12 +9,15 @@ namespace FHF\OrderGrid;
  */
 class Settings extends BaseComponent
 {
+
     public function __construct()
     {
         add_action('admin_menu', [$this, 'add_admin_menu']);
+
     }
 
     public function add_admin_menu(){
+
         add_menu_page(
             'Order Settings',
             'Order List',
@@ -41,7 +44,7 @@ class Settings extends BaseComponent
         $ids = [];
 
         if (isset($args['product_name']) && !empty($args['product_name'])){
-            $limit = $args['limit'];
+            $per_page = $args['per_page'];
             global $wpdb;
             $t_orders = $wpdb->prefix . "wc_orders";
             $t_order_items = $wpdb->prefix . "woocommerce_order_items";
@@ -50,9 +53,9 @@ class Settings extends BaseComponent
 
             $query  = "SELECT id FROM $t_orders AS o ";
             $query  .= "LEFT JOIN $t_order_items AS oi ON oi.order_id=o.id ";
-            $query  .= "WHERE  oi.order_item_name='". $productName . "' ";
+            $query  .= "WHERE  oi.order_item_name LIKE '%". $productName . "%' ";
             $query  .= "ORDER BY  o.date_created_gmt DESC ";
-            $query  .= "LIMIT  $limit";
+            $query  .= "LIMIT  $per_page";
 
             $orderIds = $wpdb->get_results($query, 'ARRAY_A');
 
@@ -67,15 +70,17 @@ class Settings extends BaseComponent
         }
 
         $orders = wc_get_orders($args);
+
         return $orders;
     }
 
     public function fhf_display_order(){
-        $limit = $_GET['limit'] ?? 20;
+        $per_page = $_GET['per_page'] ?? 20;
         $product_name = $_GET['product_name'] ?? "";
-
-        $orders = $this->get_order_list(['limit' => $limit, 'product_name' => $product_name]);
-
+        $orders = [];
+        if ($per_page && $product_name){
+            $orders = $this->get_order_list(['per_page' => $per_page, 'product_name' => $product_name]);
+        }
         ?>
         <div class="container-fluid">
             <h2 class="mb-4 mt-4 head">Order List</h2>
@@ -83,25 +88,28 @@ class Settings extends BaseComponent
                 <form class="row g-3 align-items-center">
                     <div class="col-auto">
                         <div class="input-group">
-                            <span class="input-group-text">Limit</span>
-                            <input type="number" id="limit" name="limit" class="form-control" min="1" value="<?php echo $limit;?>">
+                            <span class="input-group-text"><?= __('Per Page') ?></span>
+                            <input type="number" id="per_page" name="per_page" class="form-control" min="1" value="<?php echo $per_page;?>" required>
                         </div>
                     </div>
                     <div class="col-auto">
                         <div class="input-group">
-                            <span class="input-group-text">Product Name</span>
-                            <input type="text" id="product_name" name="product_name" class="form-control"  value="<?php echo $product_name;?>">
+                            <span class="input-group-text"><?= __('Product Name') ?></span>
+                            <input type="text" id="product_name" name="product_name" class="form-control"  value="<?php echo $product_name;?>" required>
                         </div>
                     </div>
                     <input type="hidden" name="page" class="form-control" value="fhf-order-grid" />
                     <div class="col-auto">
-                        <button type="submit" class="btn btn-primary ">Submit</button>
+                        <button type="submit" class="btn btn-primary "><?= __('Submit') ?></button>
                     </div>
                 </form>
                 <div>
-                    <button type="button" id="exportToExcel" class="btn btn-primary ">Export</button>
+                    <?php if (count($orders)): ?>
+                    <button type="button" id="exportToExcel" class="btn btn-primary "><?= __('Export') ?></button>
+                    <?php endif; ?>
                 </div>
             </div>
+            <?php if ($product_name && $per_page):?>
             <hr>
             <table class="table table-striped" id="fogOrderList">
                 <thead>
@@ -138,6 +146,7 @@ class Settings extends BaseComponent
                     <?php endif; ?>
                 </tbody>
             </table>
+            <?php endif; ?>
         </div>
 
         <script>
@@ -156,4 +165,5 @@ class Settings extends BaseComponent
         </script>
         <?php
     }
+
 }
